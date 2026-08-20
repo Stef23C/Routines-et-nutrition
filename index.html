@@ -1285,7 +1285,7 @@ const I18N = {
     alert_backup_invalid:"Il file non sembra un backup valido di Zenplicité.",
     confirm_restore_backup:"Questo sostituirà TUTTI i dati attuali dell'app (routine, pasti, ricette, alimenti, tutto) con quelli del file di backup. L'operazione non è reversibile. Continuare?",
     alert_backup_restored:"Backup ripristinato con successo.",
-    btn_print_section:"🖨️ Stampa foglio elegante",
+    btn_print_section:"🖨️ Stampa o salva in PDF",
     routine_title:"Routine settimanale", routine_sub:"Spunta ogni pratica svolta durante la settimana. Clicca la matita per aggiungere una nota.",
     cat_placeholder:"Nuova categoria (es. Letture, Idratazione…)", btn_add_cat:"+ Aggiungi categoria",
     journal_title:"Diario del giorno", journal_sub:"Uno spazio libero per annotare considerazioni, sensazioni e riflessioni sulla giornata.",
@@ -1456,7 +1456,7 @@ const I18N = {
     alert_backup_invalid:"Ce fichier ne semble pas être une sauvegarde Zenplicité valide.",
     confirm_restore_backup:"Cela remplacera TOUTES les données actuelles de l'application (routine, repas, recettes, aliments, tout) par celles du fichier de sauvegarde. Cette action est irréversible. Continuer ?",
     alert_backup_restored:"Sauvegarde restaurée avec succès.",
-    btn_print_section:"🖨️ Imprimer la fiche élégante",
+    btn_print_section:"🖨️ Imprimer ou enregistrer en PDF",
     routine_title:"Routine hebdomadaire", routine_sub:"Coche chaque pratique réalisée pendant la semaine. Clique sur le crayon pour ajouter une note.",
     cat_placeholder:"Nouvelle catégorie (ex. Lecture, Hydratation…)", btn_add_cat:"+ Ajouter une catégorie",
     journal_title:"Journal du jour", journal_sub:"Un espace libre pour noter tes réflexions, sensations et ressentis de la journée.",
@@ -2776,6 +2776,24 @@ function renderGoalsInputs(){
   document.getElementById('goalVitaminB9Min').value = state.nutritionGoals.vitaminB9Min;
   document.getElementById('goalVitaminB12Min').value = state.nutritionGoals.vitaminB12Min;
 }
+function rebalanceCarbsAndFat(goals){
+  const proteinKcal = (goals.proteinTarget||0) * 4;
+  const remainingKcal = goals.kcalTarget - proteinKcal;
+  const currentCarbKcal = (goals.carbsTarget||0) * 4;
+  const currentFatKcal = (goals.fatTarget||0) * 9;
+  const currentOtherTotal = currentCarbKcal + currentFatKcal;
+  if(remainingKcal <= 0) return;
+  if(currentOtherTotal <= 0){
+    goals.carbsTarget = Math.round(remainingKcal*0.55/4);
+    goals.fatTarget = Math.round(remainingKcal*0.45/9);
+    return;
+  }
+  const carbRatio = currentCarbKcal / currentOtherTotal;
+  const fatRatio = currentFatKcal / currentOtherTotal;
+  goals.carbsTarget = Math.round(remainingKcal * carbRatio / 4);
+  goals.fatTarget = Math.round(remainingKcal * fatRatio / 9);
+}
+
 [['goalKcalTarget','kcalTarget'],['goalProteinTarget','proteinTarget'],['goalCarbsTarget','carbsTarget'],['goalFatTarget','fatTarget'],
  ['goalFiberMin','fiberMin'],['goalSaltMax','saltMax'],['goalFruitTarget','fruitTarget'],['goalVegTarget','vegTarget'],
  ['goalCalciumMin','calciumMin'],['goalIronMin','ironMin'],['goalPhosphorusMin','phosphorusMin'],['goalPotassiumMin','potassiumMin'],
@@ -2785,6 +2803,10 @@ function renderGoalsInputs(){
   attachNumericClean(el);
   el.addEventListener('change', ()=>{
     state.nutritionGoals[key] = parseNum(el.value) || DEFAULT_STATE.nutritionGoals[key];
+    if(key==='proteinTarget'){
+      rebalanceCarbsAndFat(state.nutritionGoals);
+      renderGoalsInputs();
+    }
     persist();
     updateMealSummary();
   });
