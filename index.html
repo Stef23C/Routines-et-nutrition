@@ -490,7 +490,7 @@
     </div>
     <div class="top-right">
       <div class="today-pill" id="todayPill"></div>
-      <span style="font-size:10px;color:var(--ink-soft);opacity:0.6;">Lite v7</span>
+      <span style="font-size:10px;color:var(--ink-soft);opacity:0.6;">Lite v8</span>
       <button class="btn btn-ghost btn-sm no-print" id="backupExportBtn" data-i18n="btn_backup_export" title="Scarica un backup completo di tutti i tuoi dati">⬇ Backup</button>
       <button class="btn btn-ghost btn-sm no-print" id="backupImportBtn" data-i18n="btn_backup_import" title="Ripristina i dati da un file di backup">⬆ Ripristina</button>
       <input type="file" id="backupImportFile" accept=".json,application/json" style="display:none;">
@@ -1367,6 +1367,7 @@ const I18N = {
     fv_week_text:(fruit,veg)=>`Questa settimana: ${fruit} porzioni di frutta, ${veg} di verdura.`,
     salt_max_suffix:"max",
     goals_toggle:"🎯 Modifica obiettivi giornalieri",
+    print_goals_title:"Il mio fabbisogno giornaliero",
     calc_toggle:"📊 Calcola il tuo fabbisogno personalizzato",
     calc_age_label:"Età (anni)", calc_sex_label:"Sesso", calc_sex_f:"Femmina", calc_sex_m:"Maschio",
     calc_weight_label:"Peso (kg)", calc_height_label:"Altezza (cm)", calc_activity_label:"Livello di attività",
@@ -1542,6 +1543,7 @@ const I18N = {
     fv_week_text:(fruit,veg)=>`Cette semaine : ${fruit} portions de fruits, ${veg} de légumes.`,
     salt_max_suffix:"max",
     goals_toggle:"🎯 Modifier les objectifs quotidiens",
+    print_goals_title:"Mes besoins quotidiens",
     calc_toggle:"📊 Calcule tes besoins personnalisés",
     calc_age_label:"Âge (ans)", calc_sex_label:"Sexe", calc_sex_f:"Femme", calc_sex_m:"Homme",
     calc_weight_label:"Poids (kg)", calc_height_label:"Taille (cm)", calc_activity_label:"Niveau d'activité",
@@ -4777,6 +4779,24 @@ document.getElementById('addPortionBtn').addEventListener('click', ()=>{
 /* ---------- EXPORT / PRINT ---------- */
 const PALETTE = {sageDark:'#5F7355', sage:'#84987A', sagePale:'#E4EADC', beige:'#EDE5D4', cream:'#FAF6EE', ink:'#3B372C', inkSoft:'#736C5C', accent:'#C69A4E', line:'#DCD3BF'};
 
+function buildGoalsSectionHTML(goals, title){
+  const p = PALETTE;
+  let html = `<h2 style="font-family:Georgia,serif;color:${p.sageDark};font-size:16px;margin:16px 0 10px;border-bottom:2px solid ${p.line};padding-bottom:6px;">${title}</h2>`;
+  html += `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">`;
+  const goalChip = (label,val)=> `<div style="background:${p.sagePale};border-radius:100px;padding:6px 14px;font-size:12px;color:${p.sageDark};font-weight:600;">${label}: ${val}</div>`;
+  html += goalChip('Kcal', goals.kcalTarget) + goalChip(t('macro_protein_label'), goals.proteinTarget+'g') + goalChip(t('macro_carbs_label'), goals.carbsTarget+'g') + goalChip(t('macro_fat_label'), goals.fatTarget+'g') + goalChip(t('macro_fiber_label'), goals.fiberMin+'g min') + goalChip(t('macro_salt_label'), goals.saltMax+'g max') + goalChip(t('fv_fruit_label'), goals.fruitTarget) + goalChip(t('fv_veg_label'), goals.vegTarget);
+  html += `</div>`;
+  html += `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:20px;">`;
+  const microGoalKeys = ['calciumMin','ironMin','phosphorusMin','potassiumMin','vitaminDMin','vitaminB1Min','vitaminB2Min','vitaminB3Min','vitaminB6Min','vitaminB9Min','vitaminB12Min'];
+  const microChip = (label,val)=> `<div style="background:var(--beige);border-radius:100px;padding:5px 12px;font-size:11px;color:${p.inkSoft};font-weight:600;">${label}: ${val}</div>`;
+  MICRO_FIELDS.forEach((field,i)=>{
+    const unit = ['vitaminD','vitaminB9','vitaminB12'].includes(field) ? 'µg' : 'mg';
+    html += microChip(t(MICRO_LABELS_KEYS[i]).replace(/\s*\([^)]*\)/,''), goals[microGoalKeys[i]]+unit);
+  });
+  html += `</div>`;
+  return html;
+}
+
 function buildRecipeSheetHTML(r){
   const p = PALETTE;
   const m = r.macros || {};
@@ -5061,7 +5081,7 @@ document.getElementById('printRoutineBtn')?.addEventListener('click', ()=>{
 document.getElementById('printMealsBtn')?.addEventListener('click', ()=>{
   printSection(()=>{
     const p = PALETTE;
-    return buildMealsSectionHTML() + `<h2 style="font-family:Georgia,serif;color:${p.sageDark};font-size:19px;margin:24px 0 10px;">${t('report_shopping')}</h2>` + buildShoppingSectionHTML();
+    return buildGoalsSectionHTML(state.nutritionGoals, t('print_goals_title')) + buildMealsSectionHTML() + `<h2 style="font-family:Georgia,serif;color:${p.sageDark};font-size:19px;margin:24px 0 10px;">${t('report_shopping')}</h2>` + buildShoppingSectionHTML();
   }, t('meals_title'));
 });
 document.getElementById('printRecipesBtn')?.addEventListener('click', ()=>{
