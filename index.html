@@ -490,16 +490,37 @@
     </div>
     <div class="top-right">
       <div class="today-pill" id="todayPill"></div>
-      <span style="font-size:10px;color:var(--ink-soft);opacity:0.6;">Lite v5</span>
+      <span style="font-size:10px;color:var(--ink-soft);opacity:0.6;">Lite v6</span>
       <button class="btn btn-ghost btn-sm no-print" id="backupExportBtn" data-i18n="btn_backup_export" title="Scarica un backup completo di tutti i tuoi dati">⬇ Backup</button>
       <button class="btn btn-ghost btn-sm no-print" id="backupImportBtn" data-i18n="btn_backup_import" title="Ripristina i dati da un file di backup">⬆ Ripristina</button>
       <input type="file" id="backupImportFile" accept=".json,application/json" style="display:none;">
+      <button class="btn btn-ghost btn-sm no-print" id="settingsBtn" data-i18n="btn_settings" title="Impostazioni">⚙️ Impostazioni</button>
       <div class="lang-switch no-print">
         <button id="langIt" class="active">IT</button>
         <button id="langFr">FR</button>
       </div>
     </div>
   </header>
+
+  <!-- SETTINGS MODAL -->
+  <div class="modal-overlay" id="settingsModalOverlay">
+    <div class="modal" style="max-width:480px;">
+      <h2 data-i18n="settings_title">Impostazioni</h2>
+      <h3 style="font-family:var(--font-display);color:var(--sage-dark);font-size:15px;margin:20px 0 10px;padding-bottom:6px;border-bottom:2px solid var(--sage-pale);" data-i18n="settings_voice_section">Voce per la lettura delle ricette</h3>
+      <p style="font-size:12px;color:var(--ink-soft);margin:-4px 0 12px;" data-i18n="settings_voice_note">Scegli quale voce del tuo dispositivo usare quando ascolti una ricetta — separatamente per italiano e francese, così legge sempre nella lingua giusta con la voce che preferisci.</p>
+      <label style="font-size:11px;color:var(--ink-soft);font-weight:600;display:flex;flex-direction:column;gap:4px;margin-bottom:12px;">
+        <span data-i18n="settings_voice_it_label">Voce italiana</span>
+        <select id="voiceSelectIT"></select>
+      </label>
+      <label style="font-size:11px;color:var(--ink-soft);font-weight:600;display:flex;flex-direction:column;gap:4px;">
+        <span data-i18n="settings_voice_fr_label">Voce francese</span>
+        <select id="voiceSelectFR"></select>
+      </label>
+      <div class="modal-actions" style="justify-content:flex-end;margin-top:20px;">
+        <button class="btn btn-primary" id="settingsCloseBtn" data-i18n="btn_close">Chiudi</button>
+      </div>
+    </div>
+  </div>
 
   <nav class="tabs no-print">
     <button data-tab="routine" class="active" data-i18n="tab_routine">Routine</button>
@@ -1069,6 +1090,20 @@
   </div>
 </div>
 
+<!-- RECIPE VIEW MODAL (elegant read-only view) -->
+<div class="modal-overlay" id="recipeViewModalOverlay">
+  <div class="modal recipe-view-modal" style="max-width:640px;">
+    <div id="recipeViewContent"></div>
+    <div class="modal-actions no-print" style="justify-content:space-between;margin-top:20px;">
+      <button class="btn btn-ghost" id="recipeViewCloseBtn" data-i18n="btn_close">Chiudi</button>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-ghost" id="recipeViewPrintBtn" data-i18n="btn_print_section">🖨️ Stampa o salva in PDF</button>
+        <button class="btn btn-primary" id="recipeViewEditBtn" data-i18n="btn_edit_recipe">✏️ Modifica</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="save-note" id="saveNote" data-i18n="saved">Salvato</div>
 <div id="printArea"></div>
 
@@ -1282,6 +1317,10 @@ const I18N = {
     month_legend_none:"Nessuna pratica", month_legend_some:"Alcune", month_legend_all:"Tutte completate",
     btn_print_current:"🖨️ Stampa vista attuale", btn_print_report:"📄 Report completo (PDF)", btn_export_word:"📝 Esporta in Word",
     btn_backup_export:"⬇ Backup", btn_backup_import:"⬆ Ripristina",
+    btn_settings:"⚙️ Impostazioni", btn_close:"Chiudi",
+    settings_title:"Impostazioni", settings_voice_section:"Voce per la lettura delle ricette",
+    settings_voice_note:"Scegli quale voce del tuo dispositivo usare quando ascolti una ricetta — separatamente per italiano e francese, così legge sempre nella lingua giusta con la voce che preferisci.",
+    settings_voice_it_label:"Voce italiana", settings_voice_fr_label:"Voce francese", settings_voice_none:"Nessuna voce trovata per questa lingua sul tuo dispositivo",
     alert_backup_invalid:"Il file non sembra un backup valido di Zenplicité.",
     confirm_restore_backup:"Questo sostituirà TUTTI i dati attuali dell'app (routine, pasti, ricette, alimenti, tutto) con quelli del file di backup. L'operazione non è reversibile. Continuare?",
     alert_backup_restored:"Backup ripristinato con successo.",
@@ -1410,7 +1449,7 @@ const I18N = {
     recipe_audio_label:"Audio della ricetta (facoltativo)", recipe_video_label:"Video della ricetta (facoltativo)",
     media_session_note:"Audio e video caricati restano disponibili solo in questa sessione: usa il campo Link per contenuti da conservare stabilmente.",
     report_link:"Link",
-    btn_delete_recipe:"Elimina ricetta",
+    btn_delete_recipe:"Elimina ricetta", btn_edit_recipe:"✏️ Modifica",
     saved:"Salvato",
     confirm_delete_recipe:"Eliminare definitivamente questa ricetta?",
     confirm_remove_cat:(cat)=>`Rimuovere la categoria "${cat}" da tutta la settimana?`,
@@ -1453,6 +1492,10 @@ const I18N = {
     month_legend_none:"Aucune pratique", month_legend_some:"Quelques-unes", month_legend_all:"Toutes accomplies",
     btn_print_current:"🖨️ Imprimer la vue actuelle", btn_print_report:"📄 Rapport complet (PDF)", btn_export_word:"📝 Exporter en Word",
     btn_backup_export:"⬇ Sauvegarde", btn_backup_import:"⬆ Restaurer",
+    btn_settings:"⚙️ Paramètres", btn_close:"Fermer",
+    settings_title:"Paramètres", settings_voice_section:"Voix pour la lecture des recettes",
+    settings_voice_note:"Choisis quelle voix de ton appareil utiliser pour écouter une recette — séparément pour l'italien et le français, afin qu'elle lise toujours dans la bonne langue avec la voix que tu préfères.",
+    settings_voice_it_label:"Voix italienne", settings_voice_fr_label:"Voix française", settings_voice_none:"Aucune voix trouvée pour cette langue sur ton appareil",
     alert_backup_invalid:"Ce fichier ne semble pas être une sauvegarde Zenplicité valide.",
     confirm_restore_backup:"Cela remplacera TOUTES les données actuelles de l'application (routine, repas, recettes, aliments, tout) par celles du fichier de sauvegarde. Cette action est irréversible. Continuer ?",
     alert_backup_restored:"Sauvegarde restaurée avec succès.",
@@ -1581,7 +1624,7 @@ const I18N = {
     recipe_audio_label:"Audio de la recette (facultatif)", recipe_video_label:"Vidéo de la recette (facultatif)",
     media_session_note:"Les fichiers audio et vidéo chargés ne restent disponibles que pour cette session : utilise le champ Lien pour un contenu conservé durablement.",
     report_link:"Lien",
-    btn_delete_recipe:"Supprimer la recette",
+    btn_delete_recipe:"Supprimer la recette", btn_edit_recipe:"✏️ Modifier",
     saved:"Enregistré",
     confirm_delete_recipe:"Supprimer définitivement cette recette ?",
     confirm_remove_cat:(cat)=>`Supprimer la catégorie « ${cat} » de toute la semaine ?`,
@@ -2303,6 +2346,8 @@ async function loadState(){
   if(!state.nutritionGoals) state.nutritionGoals = {...DEFAULT_STATE.nutritionGoals};
   else state.nutritionGoals = {...DEFAULT_STATE.nutritionGoals, ...state.nutritionGoals};
   if(!state.personalProfile) state.personalProfile = null;
+  if(state.preferredVoiceIT === undefined) state.preferredVoiceIT = null;
+  if(state.preferredVoiceFR === undefined) state.preferredVoiceFR = null;
   if(!state.foodsDB) state.foodsDB = DEFAULT_STATE.foodsDB.slice();
 
   // Migrate old single-name foodsDB entries to bilingual {id, name_it, name_fr}
@@ -3275,7 +3320,7 @@ function renderRecipes(){
   grid.innerHTML = html;
 
   grid.querySelectorAll('.recipe-card').forEach(card=>{
-    card.addEventListener('click', ()=> openRecipeModal(card.dataset.id));
+    card.addEventListener('click', ()=> openRecipeViewModal(card.dataset.id));
   });
   grid.querySelectorAll('.listen-card-btn').forEach(btn=>{
     btn.addEventListener('click', ()=>{
@@ -3489,6 +3534,55 @@ function updateTtsPlayerUI(){
   if(nextBtn) nextBtn.disabled = speechChunkIndex >= speechChunks.length-1;
 }
 
+/* ---------- SETTINGS: VOICE SELECTION ---------- */
+let availableVoices = [];
+function loadAvailableVoices(){
+  if(!('speechSynthesis' in window)) return;
+  availableVoices = window.speechSynthesis.getVoices();
+  if(availableVoices.length) renderVoiceSettings();
+}
+if('speechSynthesis' in window){
+  loadAvailableVoices();
+  window.speechSynthesis.addEventListener('voiceschanged', loadAvailableVoices);
+}
+function renderVoiceSettings(){
+  if(!state) return;
+  const itVoices = availableVoices.filter(v=>v.lang && v.lang.toLowerCase().startsWith('it'));
+  const frVoices = availableVoices.filter(v=>v.lang && v.lang.toLowerCase().startsWith('fr'));
+  const selIT = document.getElementById('voiceSelectIT');
+  const selFR = document.getElementById('voiceSelectFR');
+  const buildOptions = (voices, selected)=>{
+    if(!voices.length) return `<option value="">${t('settings_voice_none')}</option>`;
+    return voices.map(v=>`<option value="${escapeAttr(v.name)}" ${v.name===selected?'selected':''}>${escapeHtml(v.name)}</option>`).join('');
+  };
+  selIT.innerHTML = buildOptions(itVoices, state.preferredVoiceIT);
+  selFR.innerHTML = buildOptions(frVoices, state.preferredVoiceFR);
+}
+function getPreferredVoice(lang){
+  if(!availableVoices.length) return null;
+  const preferredName = lang==='fr' ? state.preferredVoiceFR : state.preferredVoiceIT;
+  if(preferredName){
+    const match = availableVoices.find(v=>v.name===preferredName);
+    if(match) return match;
+  }
+  return null;
+}
+document.getElementById('settingsBtn').addEventListener('click', ()=>{
+  loadAvailableVoices();
+  document.getElementById('settingsModalOverlay').classList.add('show');
+});
+document.getElementById('settingsCloseBtn').addEventListener('click', ()=>{
+  document.getElementById('settingsModalOverlay').classList.remove('show');
+});
+document.getElementById('voiceSelectIT').addEventListener('change', (e)=>{
+  state.preferredVoiceIT = e.target.value || null;
+  persist();
+});
+document.getElementById('voiceSelectFR').addEventListener('change', (e)=>{
+  state.preferredVoiceFR = e.target.value || null;
+  persist();
+});
+
 function speakChunk(idx){
   if(!('speechSynthesis' in window)) return;
   if(idx < 0 || idx >= speechChunks.length){ stopSpeaking(); return; }
@@ -3502,6 +3596,8 @@ function speakChunk(idx){
     updateListenButtons();
     const utter = new SpeechSynthesisUtterance(speechChunks[idx].text);
     utter.lang = currentLang === 'fr' ? 'fr-FR' : 'it-IT';
+    const preferredVoice = getPreferredVoice(currentLang);
+    if(preferredVoice) utter.voice = preferredVoice;
     utter.rate = 0.95;
     utter.onend = ()=>{
       if(myGen !== speechGeneration) return;
@@ -3646,6 +3742,30 @@ document.getElementById('rVideoFile').addEventListener('change', (e)=>{
 });
 document.getElementById('genQrBtn').addEventListener('click', ()=>{
   renderQR(document.getElementById('rLink').value.trim());
+});
+
+function openRecipeViewModal(id){
+  const r = state.recipes.find(x=>x.id===id);
+  if(!r) return;
+  document.getElementById('recipeViewContent').innerHTML = buildRecipeSheetHTML(r);
+  document.getElementById('recipeViewEditBtn').dataset.id = id;
+  document.getElementById('recipeViewModalOverlay').classList.add('show');
+}
+document.getElementById('recipeViewCloseBtn').addEventListener('click', ()=>{
+  document.getElementById('recipeViewModalOverlay').classList.remove('show');
+});
+document.getElementById('recipeViewEditBtn').addEventListener('click', (e)=>{
+  const id = e.target.dataset.id || e.currentTarget.dataset.id;
+  document.getElementById('recipeViewModalOverlay').classList.remove('show');
+  openRecipeModal(id);
+});
+document.getElementById('recipeViewPrintBtn').addEventListener('click', ()=>{
+  const id = document.getElementById('recipeViewEditBtn').dataset.id;
+  const r = state.recipes.find(x=>x.id===id);
+  if(!r) return;
+  document.getElementById('printArea').innerHTML = buildRecipeSheetHTML(r);
+  document.body.classList.add('printing-full');
+  window.print();
 });
 
 function openRecipeModal(id){
