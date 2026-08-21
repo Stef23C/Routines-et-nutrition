@@ -240,6 +240,7 @@
   }
   .dish-row input.food-qty-input{font-family:var(--font-body);}
   .food-not-found{border-color:#B65B4F !important;background:#FBEDEB !important;}
+  .ing-not-linked{border-color:#B65B4F !important;background:#FBEDEB !important;}
 
   .macro-summary{display:flex;gap:14px;flex-wrap:wrap;margin-top:6px;}
   .macro-chip{
@@ -490,7 +491,7 @@
     </div>
     <div class="top-right">
       <div class="today-pill" id="todayPill"></div>
-      <span style="font-size:10px;color:var(--ink-soft);opacity:0.6;">Lite v10</span>
+      <span style="font-size:10px;color:var(--ink-soft);opacity:0.6;">Lite v11</span>
       <button class="btn btn-ghost btn-sm no-print" id="backupExportBtn" data-i18n="btn_backup_export" title="Scarica un backup completo di tutti i tuoi dati">⬇ Backup</button>
       <button class="btn btn-ghost btn-sm no-print" id="backupImportBtn" data-i18n="btn_backup_import" title="Ripristina i dati da un file di backup">⬆ Ripristina</button>
       <input type="file" id="backupImportFile" accept=".json,application/json" style="display:none;">
@@ -1443,6 +1444,8 @@ const I18N = {
     recipe_name_fr_ph:"Nom en français (facoltativo)", recipe_instructions_fr_ph:"Préparation en français (facoltativo)…",
     btn_auto_calc:"🧮 Calcola dai valori degli ingredienti",
     auto_calc_note:"Collega ogni ingrediente a un alimento del database (scheda Equivalenze) e indica la quantità in grammi per includerlo nel calcolo automatico. Puoi comunque correggere i valori a mano.",
+    ing_not_linked_note:"Questo ingrediente non è collegato a un alimento del database: non contribuirà al calcolo dei micronutrienti (vitamine e minerali).",
+    unlinked_ingredients_note:(n)=>`${n===1?'1 ingrediente non è collegato':`${n} ingredienti non sono collegati`} al database — i micronutrienti mostrati sono calcolati solo su quelli collegati e potrebbero essere incompleti.`,
     auto_calc_none:"Nessun ingrediente collegato a un alimento del database con quantità in grammi: collega almeno un ingrediente per calcolare automaticamente.",
     recipe_link_label:"Link (video, audio, articolo…)", recipe_link_ph:"https://…", btn_gen_qr:"Genera QR code",
     recipe_photo_label:"Foto della ricetta (facoltativa)", btn_remove_photo:"Rimuovi foto",
@@ -1620,6 +1623,8 @@ const I18N = {
     recipe_name_fr_ph:"Nom en français (facultatif)", recipe_instructions_fr_ph:"Préparation en français (facultatif)…",
     btn_auto_calc:"🧮 Calculer à partir des ingrédients",
     auto_calc_note:"Associe chaque ingrédient à un aliment de la base de données (onglet Équivalences) et indique la quantité en grammes pour l'inclure dans le calcul automatique. Tu peux toujours corriger les valeurs à la main.",
+    ing_not_linked_note:"Cet ingrédient n'est pas associé à un aliment de la base de données : il ne contribuera pas au calcul des micronutriments (vitamines et minéraux).",
+    unlinked_ingredients_note:(n)=>`${n===1?"1 ingrédient n'est pas associé":`${n} ingrédients ne sont pas associés`} à la base de données — les micronutriments affichés sont calculés uniquement sur ceux associés et peuvent être incomplets.`,
     auto_calc_none:"Aucun ingrédient associé à un aliment de la base de données avec une quantité en grammes : associe au moins un ingrédient pour calculer automatiquement.",
     recipe_link_label:"Lien (vidéo, audio, article…)", recipe_link_ph:"https://…", btn_gen_qr:"Générer le QR code",
     recipe_photo_label:"Photo de la recette (facultative)", btn_remove_photo:"Supprimer la photo",
@@ -1675,6 +1680,20 @@ function recipeInstructions(r){
   if(!r) return '';
   if(currentLang==='fr' && r.instructions_fr) return r.instructions_fr;
   return r.instructions || '';
+}
+const CATEGORY_IT_TO_FR = {
+  'colazione':'Petit-déjeuner', 'pranzo':'Déjeuner', 'cena':'Dîner', 'spuntino':'Collation',
+  'antipasto':'Entrée', 'primo':'Premier plat', 'primo piatto':'Premier plat',
+  'secondo':'Plat principal', 'secondo piatto':'Plat principal',
+  'contorno':'Accompagnement', 'dolce':'Dessert', 'dolci':'Desserts', 'bevanda':'Boisson', 'bevande':'Boissons'
+};
+function recipeCategory(r){
+  if(!r || !r.category) return '';
+  if(currentLang==='fr'){
+    const translated = CATEGORY_IT_TO_FR[r.category.trim().toLowerCase()];
+    if(translated) return translated;
+  }
+  return r.category;
 }
 function ingredientDisplayName(ing){
   if(!ing) return '';
@@ -3325,7 +3344,7 @@ function renderRecipes(){
     const linkBtn = r.link ? `<a href="${escapeAttr(r.link)}" target="_blank" rel="noopener" class="btn btn-ghost btn-sm" style="display:inline-block;" onclick="event.stopPropagation()">🔗 ${escapeHtml(r.link.length>26?r.link.slice(0,26)+'…':r.link)}</a>` : '';
     return `<div class="recipe-card" data-id="${r.id}">
       ${r.photo ? `<img class="recipe-card-photo" src="${r.photo}">` : ''}
-      <span class="recipe-cat-tag">${escapeHtml(r.category||'')}</span>
+      <span class="recipe-cat-tag">${escapeHtml(recipeCategory(r))}</span>
       <h4>${escapeHtml(recipeName(r))}</h4>
       <div style="font-size:12px;color:var(--ink-soft);">${(r.ingredients||[]).length} · ${r.servings||1} ${t('servings_word')}</div>
       <div class="r-macros">${m.kcal?`${m.kcal} kcal · `:''}${m.protein?`P ${m.protein}g `:''}${m.carbs?`C ${m.carbs}g `:''}${m.fat?`G ${m.fat}g`:''}</div>
@@ -3416,18 +3435,22 @@ function renderIngredientRows(){
   wrap.innerHTML = ingredientDraft.map((ing,i)=>{
     const linkedFood = ing.foodRef ? state.foodsDB.find(f=>f.id===ing.foodRef) : null;
     const linkedName = linkedFood ? escapeAttr(foodName(linkedFood)) : '';
+    const notLinked = ing.name && ing.name.trim() && !ing.foodRef;
     return `
     <div class="ing-row" data-idx="${i}">
       <input autocomplete="off" type="text" class="iname" placeholder="${escapeAttr(t('ingredients_label'))}" value="${escapeAttr(ing.name)}">
       <input autocomplete="off" type="text" class="iqty" placeholder="Qty (g)" value="${escapeAttr(ing.qty)}">
       <input autocomplete="off" type="text" class="iunit" placeholder="Unit" value="${escapeAttr(ing.unit)}">
-      <input autocomplete="off" type="text" list="foodsDatalist" class="ilink" title="${escapeAttr(t('auto_calc_note'))}" placeholder="${escapeAttr(t('search_food_ph'))}" value="${linkedName}">
+      <input autocomplete="off" type="text" list="foodsDatalist" class="ilink${notLinked?' ing-not-linked':''}" title="${notLinked?escapeAttr(t('ing_not_linked_note')):escapeAttr(t('auto_calc_note'))}" placeholder="${escapeAttr(t('search_food_ph'))}" value="${linkedName}">
       <button class="icon-btn" data-removeing="${i}">✕</button>
     </div>`;
   }).join('');
   wrap.querySelectorAll('.ing-row').forEach(row=>{
     const idx = Number(row.dataset.idx);
-    row.querySelector('.iname').addEventListener('input', e=> ingredientDraft[idx].name = e.target.value);
+    row.querySelector('.iname').addEventListener('input', e=> {
+      ingredientDraft[idx].name = e.target.value;
+      row.querySelector('.ilink').classList.toggle('ing-not-linked', !!(e.target.value.trim() && !ingredientDraft[idx].foodRef));
+    });
     row.querySelector('.iqty').addEventListener('input', e=> ingredientDraft[idx].qty = e.target.value);
     row.querySelector('.iunit').addEventListener('input', e=> ingredientDraft[idx].unit = e.target.value);
     const linkSel = row.querySelector('.ilink');
@@ -3436,6 +3459,7 @@ function renderIngredientRows(){
       const match = state.foodsDB.find(f=>foodName(f).toLowerCase()===typed);
       ingredientDraft[idx].foodRef = match ? match.id : '';
       if(!match) e.target.value = '';
+      e.target.classList.toggle('ing-not-linked', !!(ingredientDraft[idx].name && ingredientDraft[idx].name.trim() && !match));
     });
   });
   wrap.querySelectorAll('[data-removeing]').forEach(btn=>{
@@ -4839,7 +4863,7 @@ function buildRecipeSheetHTML(r){
   }
   html += `<h1 style="font-family:Georgia,serif;color:${p.sageDark};font-size:28px;margin:0 0 6px;">${escapeHtml(recipeName(r))}</h1>`;
   const metaParts = [];
-  if(r.category) metaParts.push(escapeHtml(r.category));
+  if(r.category) metaParts.push(escapeHtml(recipeCategory(r)));
   metaParts.push(`${escapeHtml(String(r.servings||1))} ${t('report_portions')}`);
   if(m.kcal) metaParts.push(`${escapeHtml(String(m.kcal))} kcal`);
   html += `<div style="font-size:13px;color:${p.inkSoft};margin-bottom:20px;letter-spacing:0.3px;">${metaParts.join(' · ')}</div>`;
@@ -4853,13 +4877,19 @@ function buildRecipeSheetHTML(r){
   const microTotals = computeRecipeMicronutrients(r, 1);
   const microHasValues = MICRO_FIELDS.some(f=>microTotals[f] > 0);
   if(microHasValues){
-    html += `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:24px;">`;
+    html += `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">`;
     const microChip = (label,val,unit)=> val>0 ? `<div style="background:var(--beige);border-radius:100px;padding:5px 12px;font-size:11px;color:${p.inkSoft};font-weight:600;">${label} ${Math.round(val*10)/10}${unit}</div>` : '';
     MICRO_FIELDS.forEach((field,i)=>{
       const unit = ['vitaminD','vitaminB9','vitaminB12'].includes(field) ? 'µg' : 'mg';
       html += microChip(t(MICRO_LABELS_KEYS[i]).replace(/\s*\([^)]*\)/,''), microTotals[field], unit);
     });
     html += `</div>`;
+  }
+  const unlinkedCount = (r.ingredients||[]).filter(i=>i.name && i.name.trim() && !i.foodRef).length;
+  if(unlinkedCount > 0){
+    html += `<p style="font-size:11px;color:${p.inkSoft};font-style:italic;margin:0 0 20px;">${t('unlinked_ingredients_note')(unlinkedCount)}</p>`;
+  } else if(microHasValues){
+    html += `<div style="margin-bottom:16px;"></div>`;
   }
 
   html += `<h2 style="font-family:Georgia,serif;color:${p.sageDark};font-size:17px;margin:0 0 10px;border-bottom:2px solid ${p.line};padding-bottom:6px;">${t('ingredients_label')}</h2>`;
@@ -5010,7 +5040,7 @@ function buildRecipesSectionHTML(){
       html += `<div style="margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid ${p.line};page-break-inside:avoid;">`;
       if(r.photo) html += `<img src="${r.photo}" style="width:100%;max-height:220px;object-fit:cover;border-radius:12px;margin-bottom:10px;">`;
       html += `<h3 style="font-family:Georgia,serif;color:${p.sageDark};font-size:15px;margin:0 0 3px;">${escapeHtml(recipeName(r))}</h3>`;
-      html += `<div style="font-size:11px;color:${p.inkSoft};margin-bottom:6px;">${escapeHtml(r.category||'')} · ${escapeHtml(String(r.servings||1))} ${t('report_portions')}${m.kcal?` · ${escapeHtml(String(m.kcal))} kcal`:''}${m.protein?` · P ${escapeHtml(String(m.protein))}g`:''}${m.carbs?` · C ${escapeHtml(String(m.carbs))}g`:''}${m.fat?` · G ${escapeHtml(String(m.fat))}g`:''}${m.fiber?` · ${t('macro_fiber_label')} ${escapeHtml(String(m.fiber))}g`:''}${m.salt?` · ${t('macro_salt_label')} ${escapeHtml(String(m.salt))}g`:''}</div>`;
+      html += `<div style="font-size:11px;color:${p.inkSoft};margin-bottom:6px;">${escapeHtml(recipeCategory(r))} · ${escapeHtml(String(r.servings||1))} ${t('report_portions')}${m.kcal?` · ${escapeHtml(String(m.kcal))} kcal`:''}${m.protein?` · P ${escapeHtml(String(m.protein))}g`:''}${m.carbs?` · C ${escapeHtml(String(m.carbs))}g`:''}${m.fat?` · G ${escapeHtml(String(m.fat))}g`:''}${m.fiber?` · ${t('macro_fiber_label')} ${escapeHtml(String(m.fiber))}g`:''}${m.salt?` · ${t('macro_salt_label')} ${escapeHtml(String(m.salt))}g`:''}</div>`;
       if((r.ingredients||[]).length){
         html += `<div style="font-size:12.5px;margin-bottom:6px;"><strong>${t('report_ingredients')}:</strong> ${r.ingredients.map(i=>`${escapeHtml(ingredientDisplayName(i))}${i.qty?` (${escapeHtml(String(i.qty))} ${escapeHtml(i.unit||'')})`:''}`).join(', ')}</div>`;
       }
