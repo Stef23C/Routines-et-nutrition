@@ -490,7 +490,7 @@
     </div>
     <div class="top-right">
       <div class="today-pill" id="todayPill"></div>
-      <span style="font-size:10px;color:var(--ink-soft);opacity:0.6;">Lite v6</span>
+      <span style="font-size:10px;color:var(--ink-soft);opacity:0.6;">Lite v7</span>
       <button class="btn btn-ghost btn-sm no-print" id="backupExportBtn" data-i18n="btn_backup_export" title="Scarica un backup completo di tutti i tuoi dati">⬇ Backup</button>
       <button class="btn btn-ghost btn-sm no-print" id="backupImportBtn" data-i18n="btn_backup_import" title="Ripristina i dati da un file di backup">⬆ Ripristina</button>
       <input type="file" id="backupImportFile" accept=".json,application/json" style="display:none;">
@@ -4792,9 +4792,20 @@ function buildRecipeSheetHTML(r){
   html += `<div style="font-size:13px;color:${p.inkSoft};margin-bottom:20px;letter-spacing:0.3px;">${metaParts.join(' · ')}</div>`;
 
   if(m.protein || m.carbs || m.fat || m.fiber || m.salt){
-    html += `<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:24px;">`;
+    html += `<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;">`;
     const chip = (label,val)=> val ? `<div style="background:${p.sagePale};border-radius:100px;padding:6px 14px;font-size:12px;color:${p.sageDark};font-weight:600;">${label} ${escapeHtml(String(val))}g</div>` : '';
     html += chip(t('macro_protein_label'), m.protein) + chip(t('macro_carbs_label'), m.carbs) + chip(t('macro_fat_label'), m.fat) + chip(t('macro_fiber_label'), m.fiber) + chip(t('macro_salt_label'), m.salt);
+    html += `</div>`;
+  }
+  const microTotals = computeRecipeMicronutrients(r, 1);
+  const microHasValues = MICRO_FIELDS.some(f=>microTotals[f] > 0);
+  if(microHasValues){
+    html += `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:24px;">`;
+    const microChip = (label,val,unit)=> val>0 ? `<div style="background:var(--beige);border-radius:100px;padding:5px 12px;font-size:11px;color:${p.inkSoft};font-weight:600;">${label} ${Math.round(val*10)/10}${unit}</div>` : '';
+    MICRO_FIELDS.forEach((field,i)=>{
+      const unit = ['vitaminD','vitaminB9','vitaminB12'].includes(field) ? 'µg' : 'mg';
+      html += microChip(t(MICRO_LABELS_KEYS[i]).replace(/\s*\([^)]*\)/,''), microTotals[field], unit);
+    });
     html += `</div>`;
   }
 
