@@ -491,7 +491,7 @@
     </div>
     <div class="top-right">
       <div class="today-pill" id="todayPill"></div>
-      <span style="font-size:10px;color:var(--ink-soft);opacity:0.6;">Lite v11</span>
+      <span style="font-size:10px;color:var(--ink-soft);opacity:0.6;">Lite v12</span>
       <button class="btn btn-ghost btn-sm no-print" id="backupExportBtn" data-i18n="btn_backup_export" title="Scarica un backup completo di tutti i tuoi dati">⬇ Backup</button>
       <button class="btn btn-ghost btn-sm no-print" id="backupImportBtn" data-i18n="btn_backup_import" title="Ripristina i dati da un file di backup">⬆ Ripristina</button>
       <input type="file" id="backupImportFile" accept=".json,application/json" style="display:none;">
@@ -704,6 +704,7 @@
       <button class="btn btn-ghost btn-sm" id="exportRecipesBtn" data-i18n="btn_export_recipes">⬇ Esporta ricette (JSON)</button>
       <button class="btn btn-ghost btn-sm" id="importRecipesBtn" data-i18n="btn_import_recipes">⬆ Importa ricette (JSON o testo)</button>
       <button class="btn btn-ghost btn-sm" id="printRecipesBtn" data-i18n="btn_print_section">🖨️ Stampa foglio elegante</button>
+      <button class="btn btn-ghost btn-sm" id="recalcAllRecipesBtn" data-i18n="btn_recalc_all">🔄 Ricalcola tutte le ricette</button>
       <input type="file" id="importRecipesFile" accept=".txt,.csv,.json,text/plain,text/csv,application/json" style="display:none;">
     </div>
     <input autocomplete="off" type="text" id="recipeSearchInput" class="search-input no-print" data-i18n-ph="search_recipes_ph" placeholder="Cerca ricetta…">
@@ -1345,6 +1346,9 @@ const I18N = {
     recipes_title:"Le mie ricette", recipes_sub:"Crea, modifica ed elimina le tue ricette con ingredienti e valori nutrizionali.",
     new_recipe_tile:"+ Nuova ricetta",
     btn_export_recipes:"⬇ Esporta ricette (JSON)", btn_import_recipes:"⬆ Importa ricette (JSON o testo)",
+    btn_recalc_all:"🔄 Ricalcola tutte le ricette",
+    confirm_recalc_all:"Questo ricalcola i valori nutrizionali (kcal, proteine, carboidrati, grassi, fibre, sale) di tutte le ricette che hanno ingredienti collegati al database, sovrascrivendo i valori attuali. Procedere?",
+    recalc_all_result:(updated,skipped)=>`Fatto! ${updated} ricette aggiornate.${skipped>0?` ${skipped} non avevano ingredienti collegati e sono state saltate.`:''}`,
     preview_linked_ingredients_label:"Collegamenti automatici",
     preview_linked_ingredients_text:(linked,total)=>`${linked} di ${total} ingredienti collegati automaticamente ad alimenti già nel database (per il calcolo nutrizionale).`,
     btn_export_foods:"⬇ Esporta alimenti (JSON)", btn_import_foods:"⬆ Importa alimenti (JSON o testo)",
@@ -1524,6 +1528,9 @@ const I18N = {
     recipes_title:"Mes recettes", recipes_sub:"Crée, modifie et supprime tes recettes avec les ingrédients et les valeurs nutritionnelles.",
     new_recipe_tile:"+ Nouvelle recette",
     btn_export_recipes:"⬇ Exporter les recettes (JSON)", btn_import_recipes:"⬆ Importer des recettes (JSON ou texte)",
+    btn_recalc_all:"🔄 Recalculer toutes les recettes",
+    confirm_recalc_all:"Cela recalcule les valeurs nutritionnelles (kcal, protéines, glucides, lipides, fibres, sel) de toutes les recettes dont les ingrédients sont associés à la base de données, en écrasant les valeurs actuelles. Continuer ?",
+    recalc_all_result:(updated,skipped)=>`C'est fait ! ${updated} recettes mises à jour.${skipped>0?` ${skipped} n'avaient pas d'ingrédients associés et ont été ignorées.`:''}`,
     preview_linked_ingredients_label:"Liaisons automatiques",
     preview_linked_ingredients_text:(linked,total)=>`${linked} ingrédient${linked===1?'':'s'} sur ${total} lié${linked===1?'':'s'} automatiquement à des aliments déjà présents dans la base (pour le calcul nutritionnel).`,
     btn_export_foods:"⬇ Exporter les aliments (JSON)", btn_import_foods:"⬆ Importer des aliments (JSON ou texte)",
@@ -3470,10 +3477,10 @@ function renderIngredientRows(){
   });
 }
 
-function calcMacrosFromIngredients(){
+function computeMacrosFromIngredients(ingredients){
   const totals = {kcal:0, protein:0, carbs:0, fat:0, fiber:0, salt:0};
   let matched = 0;
-  ingredientDraft.forEach(ing=>{
+  (ingredients||[]).forEach(ing=>{
     if(!ing.foodRef) return;
     const food = state.foodsDB.find(f=>f.id===ing.foodRef);
     if(!food) return;
@@ -3489,15 +3496,42 @@ function calcMacrosFromIngredients(){
     totals.salt += (Number(food.salt)||0)/100*grams;
     matched++;
   });
-  if(matched===0){ alert(t('auto_calc_none')); return; }
-  document.getElementById('rKcal').value = Math.round(totals.kcal);
-  document.getElementById('rProtein').value = Math.round(totals.protein*10)/10;
-  document.getElementById('rCarbs').value = Math.round(totals.carbs*10)/10;
-  document.getElementById('rFat').value = Math.round(totals.fat*10)/10;
-  document.getElementById('rFiber').value = Math.round(totals.fiber*10)/10;
-  document.getElementById('rSalt').value = Math.round(totals.salt*100)/100;
+  return {...totals, matched};
+}
+function calcMacrosFromIngredients(){
+  const result = computeMacrosFromIngredients(ingredientDraft);
+  if(result.matched===0){ alert(t('auto_calc_none')); return; }
+  document.getElementById('rKcal').value = Math.round(result.kcal);
+  document.getElementById('rProtein').value = Math.round(result.protein*10)/10;
+  document.getElementById('rCarbs').value = Math.round(result.carbs*10)/10;
+  document.getElementById('rFat').value = Math.round(result.fat*10)/10;
+  document.getElementById('rFiber').value = Math.round(result.fiber*10)/10;
+  document.getElementById('rSalt').value = Math.round(result.salt*100)/100;
 }
 document.getElementById('autoCalcMacrosBtn').addEventListener('click', calcMacrosFromIngredients);
+
+function recalcAllRecipeMacros(){
+  let updated = 0, skipped = 0;
+  state.recipes.forEach(r=>{
+    const result = computeMacrosFromIngredients(r.ingredients);
+    if(result.matched===0){ skipped++; return; }
+    r.macros = {
+      kcal: Math.round(result.kcal),
+      protein: Math.round(result.protein*10)/10,
+      carbs: Math.round(result.carbs*10)/10,
+      fat: Math.round(result.fat*10)/10,
+      fiber: Math.round(result.fiber*10)/10,
+      salt: Math.round(result.salt*100)/100
+    };
+    updated++;
+  });
+  persist();
+  renderRecipes();
+  alert(t('recalc_all_result')(updated, skipped));
+}
+document.getElementById('recalcAllRecipesBtn')?.addEventListener('click', ()=>{
+  if(confirm(t('confirm_recalc_all'))) recalcAllRecipeMacros();
+});
 
 document.getElementById('addIngredientBtn').addEventListener('click', ()=>{
   ingredientDraft.push({name:'', qty:'', unit:'', foodRef:''});
