@@ -491,7 +491,7 @@
     </div>
     <div class="top-right">
       <div class="today-pill" id="todayPill"></div>
-      <span style="font-size:10px;color:var(--ink-soft);opacity:0.6;">Lite v13</span>
+      <span style="font-size:10px;color:var(--ink-soft);opacity:0.6;">Lite v14</span>
       <button class="btn btn-ghost btn-sm no-print" id="backupExportBtn" data-i18n="btn_backup_export" title="Scarica un backup completo di tutti i tuoi dati">⬇ Backup</button>
       <button class="btn btn-ghost btn-sm no-print" id="backupImportBtn" data-i18n="btn_backup_import" title="Ripristina i dati da un file di backup">⬆ Ripristina</button>
       <input type="file" id="backupImportFile" accept=".json,application/json" style="display:none;">
@@ -1134,11 +1134,20 @@ const DIET_TYPES = {
 const DIET_ORDER = ['onnivora','mediterranea','vegetariana','vegana','antinfiammatoria','chetogenica','paleo'];
 const ACTIVITY_FACTORS = {sedentario:1.2, leggero:1.375, moderato:1.55, attivo:1.725, moltoattivo:1.9};
 const LAF_VALUES = [1.4,1.6,1.8,2.0];
-function nearestLaf(activityLevel){
-  const factor = ACTIVITY_FACTORS[activityLevel] || 1.55;
-  // map our 5 activity levels onto the 4 EFSA LAF columns
-  const approx = {sedentario:1.4, leggero:1.6, moderato:1.6, attivo:1.8, moltoattivo:2.0}[activityLevel];
-  return approx || LAF_VALUES.reduce((a,b)=>Math.abs(b-factor*1.15)<Math.abs(a-factor*1.15)?b:a);
+function interpolateLafTable(table, factor){
+  const keys = Object.keys(table).map(Number).sort((a,b)=>a-b);
+  if(keys.length===1) return table[keys[0]];
+  let i;
+  if(factor <= keys[0]) i = 0;
+  else if(factor >= keys[keys.length-1]) i = keys.length-2;
+  else {
+    i = 0;
+    for(let j=0;j<keys.length-1;j++){
+      if(factor >= keys[j] && factor <= keys[j+1]){ i=j; break; }
+    }
+  }
+  const ratio = (factor - keys[i]) / (keys[i+1] - keys[i]);
+  return table[keys[i]] + ratio * (table[keys[i+1]] - table[keys[i]]);
 }
 
 /* ---- Tabelle EFSA "Dietary Reference Values" (energia e proteine), per fascia età/sesso/LAF ---- */
@@ -1175,18 +1184,17 @@ function fibreAI(age){
 }
 const MJ_TO_KCAL = 238.845;
 function energiaAR_kcal(profile){
-  const age = profile.age, sex = profile.sex, laf = nearestLaf(profile.activityLevel);
+  const age = profile.age, sex = profile.sex;
+  const factor = ACTIVITY_FACTORS[profile.activityLevel] || 1.55;
   let mj;
   if(age>=18){
     const band = age<=29?"18-29":age<=39?"30-39":age<=49?"40-49":age<=59?"50-59":age<=69?"60-69":"70-79";
     const table = ADULT_ENERGY_MJ[sex][band];
-    mj = table[laf] || table[LAF_VALUES.reduce((a,b)=>Math.abs(b-laf)<Math.abs(a-laf)?b:a)];
+    mj = interpolateLafTable(table, factor);
   } else {
     const a = Math.max(1,Math.min(17,Math.round(age)));
     const table = CHILD_ENERGY_MJ[sex][a] || CHILD_ENERGY_MJ[sex][a<10?3:10];
-    const keys = Object.keys(table).map(Number);
-    const nearest = keys.reduce((x,y)=>Math.abs(y-laf)<Math.abs(x-laf)?y:x);
-    mj = table[nearest];
+    mj = interpolateLafTable(table, factor);
   }
   if(profile.status==='t1'||profile.status==='t2'||profile.status==='t3') mj += PREGNANCY_ADD_MJ[profile.status];
   if(profile.status==='lact1'||profile.status==='lact2') mj += LACTATION_ADD_MJ[profile.status];
