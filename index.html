@@ -491,7 +491,7 @@
     </div>
     <div class="top-right">
       <div class="today-pill" id="todayPill"></div>
-      <span style="font-size:10px;color:var(--ink-soft);opacity:0.6;">Lite v12</span>
+      <span style="font-size:10px;color:var(--ink-soft);opacity:0.6;">Lite v13</span>
       <button class="btn btn-ghost btn-sm no-print" id="backupExportBtn" data-i18n="btn_backup_export" title="Scarica un backup completo di tutti i tuoi dati">⬇ Backup</button>
       <button class="btn btn-ghost btn-sm no-print" id="backupImportBtn" data-i18n="btn_backup_import" title="Ripristina i dati da un file di backup">⬆ Ripristina</button>
       <input type="file" id="backupImportFile" accept=".json,application/json" style="display:none;">
@@ -2372,7 +2372,7 @@ function persist(){
   clearTimeout(saveTimeout);
   saveTimeout = setTimeout(async ()=>{
     try{
-      await storageSet('zenplicite-state', JSON.stringify(state));
+      await storageSet('zenplicite-lite-state', JSON.stringify(state));
       const note = document.getElementById('saveNote');
       note.classList.add('show');
       setTimeout(()=>note.classList.remove('show'), 1200);
@@ -2382,7 +2382,7 @@ function persist(){
 
 async function loadState(){
   try{
-    const res = await storageGet('zenplicite-state');
+    const res = await storageGet('zenplicite-lite-state');
     state = res && res.value ? JSON.parse(res.value) : JSON.parse(JSON.stringify(DEFAULT_STATE));
   }catch(e){
     state = JSON.parse(JSON.stringify(DEFAULT_STATE));
@@ -4038,7 +4038,7 @@ document.getElementById('backupImportFile').addEventListener('change', (e)=>{
         document.getElementById('backupImportFile').value = '';
         return;
       }
-      await storageSet('zenplicite-state', JSON.stringify(incomingState));
+      await storageSet('zenplicite-lite-state', JSON.stringify(incomingState));
       await init();
       alert(t('alert_backup_restored'));
     }catch(err){
