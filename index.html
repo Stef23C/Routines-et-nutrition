@@ -491,7 +491,7 @@
     </div>
     <div class="top-right">
       <div class="today-pill" id="todayPill"></div>
-      <span style="font-size:10px;color:var(--ink-soft);opacity:0.6;">Lite v14</span>
+      <span style="font-size:10px;color:var(--ink-soft);opacity:0.6;">Lite v15</span>
       <button class="btn btn-ghost btn-sm no-print" id="backupExportBtn" data-i18n="btn_backup_export" title="Scarica un backup completo di tutti i tuoi dati">⬇ Backup</button>
       <button class="btn btn-ghost btn-sm no-print" id="backupImportBtn" data-i18n="btn_backup_import" title="Ripristina i dati da un file di backup">⬆ Ripristina</button>
       <input type="file" id="backupImportFile" accept=".json,application/json" style="display:none;">
@@ -4565,6 +4565,13 @@ function attachNumericClean(el){
       const diff = before.length - cleaned.length;
       const newPos = Math.max(0, (cursor||cleaned.length) - diff);
       el.setSelectionRange(newPos, newPos);
+    }
+  });
+  el.addEventListener('keydown', (e)=>{
+    if(e.key === 'Enter'){
+      e.preventDefault();
+      el.dispatchEvent(new Event('change', {bubbles:true}));
+      el.blur();
     }
   });
 }
