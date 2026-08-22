@@ -434,6 +434,9 @@
   .book-badge.liked{background:var(--sage-pale);color:var(--sage-dark);}
   .book-badge.disliked{background:#F3DEDA;color:#B65B4F;}
   .book-notes-preview{font-size:12px;color:var(--ink-soft);margin-top:6px;line-height:1.4;max-height:2.8em;overflow:hidden;}
+  .book-cover-thumb{width:100%;height:140px;object-fit:cover;border-radius:10px;margin-bottom:10px;display:block;}
+  .book-link-btn{display:inline-block;margin-top:8px;font-size:11.5px;font-weight:600;color:var(--sage-dark);text-decoration:none;border-bottom:1px solid var(--sage-light);}
+  .book-link-btn:hover{color:var(--accent);border-color:var(--accent);}
   .book-quick-btn{
     position:absolute;top:12px;right:12px;background:var(--sage-pale);border:none;border-radius:100px;
     padding:5px 10px;font-size:11px;font-weight:700;color:var(--sage-dark);cursor:pointer;
@@ -491,7 +494,7 @@
     </div>
     <div class="top-right">
       <div class="today-pill" id="todayPill"></div>
-      <span style="font-size:10px;color:var(--ink-soft);opacity:0.6;">Lite v15</span>
+      <span style="font-size:10px;color:var(--ink-soft);opacity:0.6;">Lite v16</span>
       <button class="btn btn-ghost btn-sm no-print" id="backupExportBtn" data-i18n="btn_backup_export" title="Scarica un backup completo di tutti i tuoi dati">⬇ Backup</button>
       <button class="btn btn-ghost btn-sm no-print" id="backupImportBtn" data-i18n="btn_backup_import" title="Ripristina i dati da un file di backup">⬆ Ripristina</button>
       <input type="file" id="backupImportFile" accept=".json,application/json" style="display:none;">
@@ -995,6 +998,10 @@
     <h3 id="bookModalTitle" data-i18n="book_modal_new">Nuovo libro</h3>
     <input autocomplete="off" type="text" id="bTitle" data-i18n-ph="book_title_ph" placeholder="Titolo">
     <input autocomplete="off" type="text" id="bAuthor" data-i18n-ph="book_author_ph" placeholder="Autore">
+    <input autocomplete="off" type="text" id="bLink" data-i18n-ph="book_link_ph" placeholder="Link (es. pagina dell'editore, della libreria, di Goodreads…)">
+    <label class="field-label" data-i18n="book_photo_label">Copertina o foto (facoltativa)</label>
+    <input type="file" id="bPhotoFile" accept="image/*">
+    <div id="bPhotoPreview" style="margin:8px 0;"></div>
     <label class="field-label" data-i18n="book_shelf_label">Stato</label>
     <select id="bShelf">
       <option value="wishlist" data-i18n="shelf_wishlist">Vorrei leggere</option>
@@ -1322,6 +1329,7 @@ const I18N = {
     book_title_ph:"Titolo", book_author_ph:"Autore", book_shelf_label:"Stato", book_liked_label:"Ti è piaciuto?",
     book_liked_none:"Non ancora valutato", book_liked_yes:"Piaciuto", book_liked_no:"Non piaciuto",
     book_notes_label:"Note personali", book_notes_ph:"Cosa ne pensi, citazioni, riflessioni…",
+    book_link_ph:"Link (es. pagina dell'editore, della libreria, di Goodreads…)", book_photo_label:"Copertina o foto (facoltativa)", book_open_link:"Apri link",
     btn_delete_book:"Elimina libro", alert_book_title_needed:"Inserisci almeno il titolo del libro.",
     confirm_delete_book:"Eliminare definitivamente questo libro?",
     btn_this_week:"Questa settimana",
@@ -1504,6 +1512,7 @@ const I18N = {
     book_title_ph:"Titre", book_author_ph:"Auteur", book_shelf_label:"Statut", book_liked_label:"Tu as aimé ?",
     book_liked_none:"Pas encore évalué", book_liked_yes:"Aimé", book_liked_no:"Pas aimé",
     book_notes_label:"Notes personnelles", book_notes_ph:"Ce que tu en penses, citations, réflexions…",
+    book_link_ph:"Lien (ex. page de l'éditeur, de la librairie, de Goodreads…)", book_photo_label:"Couverture ou photo (facultative)", book_open_link:"Ouvrir le lien",
     btn_delete_book:"Supprimer le livre", alert_book_title_needed:"Indique au moins le titre du livre.",
     confirm_delete_book:"Supprimer définitivement ce livre ?",
     btn_this_week:"Cette semaine",
@@ -4634,10 +4643,12 @@ function renderBooks(){
       ? `<button type="button" class="book-quick-btn" data-markread="${b.id}">${escapeHtml(t('btn_mark_read'))}</button>` : '';
     return `<div class="book-card" data-id="${b.id}">
       ${quickBtn}
+      ${b.photo ? `<img class="book-cover-thumb" src="${b.photo}" alt="">` : ''}
       <h4>${escapeHtml(b.title)}</h4>
       <div class="book-author">${escapeHtml(b.author||'')}</div>
       <div class="book-badges">${badges.join('')}</div>
       ${b.notes ? `<div class="book-notes-preview">${escapeHtml(b.notes)}</div>` : ''}
+      ${b.link ? `<a href="${escapeAttr(b.link)}" target="_blank" rel="noopener" class="book-link-btn" data-noopen="1">${escapeHtml(t('book_open_link'))} ↗</a>` : ''}
     </div>`;
   }).join('');
   html += `<div class="new-book-tile no-print" id="newBookTile">${escapeHtml(t('new_book_tile'))}</div>`;
@@ -4646,6 +4657,7 @@ function renderBooks(){
   grid.querySelectorAll('.book-card').forEach(card=>{
     card.addEventListener('click', (e)=>{
       if(e.target.closest('[data-markread]')) return;
+      if(e.target.closest('[data-noopen]')) return;
       openBookModal(card.dataset.id);
     });
   });
@@ -4669,21 +4681,46 @@ function openBookModal(id){
     title.textContent = t('book_modal_edit');
     document.getElementById('bTitle').value = b.title||'';
     document.getElementById('bAuthor').value = b.author||'';
+    document.getElementById('bLink').value = b.link||'';
     document.getElementById('bShelf').value = b.shelf||'wishlist';
     document.getElementById('bLiked').value = b.liked||'';
     document.getElementById('bNotes').value = b.notes||'';
+    currentBookPhoto = b.photo || null;
+    renderBookPhotoPreview();
     delBtn.style.display = 'inline-block';
   } else {
     title.textContent = t('book_modal_new');
     document.getElementById('bTitle').value = '';
     document.getElementById('bAuthor').value = '';
+    document.getElementById('bLink').value = '';
     document.getElementById('bShelf').value = currentBookShelf;
     document.getElementById('bLiked').value = '';
     document.getElementById('bNotes').value = '';
+    currentBookPhoto = null;
+    renderBookPhotoPreview();
     delBtn.style.display = 'none';
   }
   overlay.classList.add('show');
 }
+let currentBookPhoto = null;
+function renderBookPhotoPreview(){
+  const wrap = document.getElementById('bPhotoPreview');
+  document.getElementById('bPhotoFile').value = '';
+  if(!currentBookPhoto){ wrap.innerHTML = ''; return; }
+  wrap.innerHTML = `<img class="recipe-photo-preview" src="${currentBookPhoto}"><button type="button" class="btn btn-ghost btn-sm" id="removeBookPhotoBtn" data-i18n="btn_remove_photo">Rimuovi foto</button>`;
+  document.getElementById('removeBookPhotoBtn').addEventListener('click', ()=>{
+    currentBookPhoto = null;
+    renderBookPhotoPreview();
+  });
+}
+document.getElementById('bPhotoFile').addEventListener('change', (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  resizeImageFile(file, 900, 0.8, (dataUrl)=>{
+    currentBookPhoto = dataUrl;
+    renderBookPhotoPreview();
+  });
+});
 document.getElementById('bookCancel').addEventListener('click', ()=>{
   document.getElementById('bookModalOverlay').classList.remove('show');
 });
@@ -4693,6 +4730,8 @@ document.getElementById('bookSave').addEventListener('click', ()=>{
   const payload = {
     title: bTitle,
     author: document.getElementById('bAuthor').value.trim(),
+    link: document.getElementById('bLink').value.trim(),
+    photo: currentBookPhoto || '',
     shelf: document.getElementById('bShelf').value,
     liked: document.getElementById('bLiked').value,
     notes: document.getElementById('bNotes').value.trim()
