@@ -494,7 +494,7 @@
     </div>
     <div class="top-right">
       <div class="today-pill" id="todayPill"></div>
-      <span style="font-size:10px;color:var(--ink-soft);opacity:0.6;">Lite v23</span>
+      <span style="font-size:10px;color:var(--ink-soft);opacity:0.6;">Lite v24</span>
       <button class="btn btn-ghost btn-sm no-print" id="backupExportBtn" data-i18n="btn_backup_export" title="Scarica un backup completo di tutti i tuoi dati">⬇ Backup</button>
       <button class="btn btn-ghost btn-sm no-print" id="backupImportBtn" data-i18n="btn_backup_import" title="Ripristina i dati da un file di backup">⬆ Ripristina</button>
       <input type="file" id="backupImportFile" accept=".json,application/json" style="display:none;">
@@ -716,7 +716,14 @@
     </div>
     <details class="no-print" style="margin-bottom:14px;">
       <summary style="cursor:pointer;font-size:12px;color:var(--sage-dark);font-weight:600;" data-i18n="bulk_group_toggle">🏷️ Assegna un gruppo a più ricette insieme</summary>
-      <p style="font-size:11.5px;color:var(--ink-soft);margin:8px 0;" data-i18n="bulk_group_note">Usa la ricerca qui sopra per trovare le ricette (es. scrivi "Anti-infiammatoria"), poi scegli o scrivi il nome del gruppo e assegnalo a tutte quelle trovate in un colpo solo.</p>
+      <div style="display:flex;gap:8px;align-items:center;margin:8px 0;">
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ink);cursor:pointer;">
+          <input type="checkbox" id="recipeSelectModeToggle" style="width:auto;margin:0;">
+          <span data-i18n="select_mode_label">Seleziona ricette a mano (spunta le card)</span>
+        </label>
+        <span id="selectedCountLabel" style="font-size:11.5px;color:var(--ink-soft);"></span>
+      </div>
+      <p id="bulkGroupNote" style="font-size:11.5px;color:var(--ink-soft);margin:8px 0;" data-i18n="bulk_group_note">Usa la ricerca qui sopra per trovare le ricette (es. scrivi "Anti-infiammatoria"), poi scegli o scrivi il nome del gruppo e assegnalo a tutte quelle trovate in un colpo solo.</p>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
         <input autocomplete="off" type="text" id="bulkGroupInput" list="recipeGroupsDatalist" data-i18n-ph="bulk_group_ph" placeholder="Nome del gruppo da assegnare…" style="flex:1;min-width:200px;">
         <button class="btn btn-primary btn-sm" id="bulkGroupApplyBtn" data-i18n="btn_bulk_group_apply">Assegna alle ricette trovate</button>
@@ -1541,6 +1548,9 @@ const I18N = {
     alert_bulk_group_no_matches:"Nessuna ricetta trovata con questa ricerca — prova a cercare prima qualcosa nella barra sopra.",
     confirm_bulk_group_apply:(n,g)=>`Assegnare il gruppo "${g}" a ${n} ${n===1?'ricetta trovata':'ricette trovate'}? Sovrascrive il gruppo attuale, se presente.`,
     alert_bulk_group_done:(n,g)=>`Fatto! ${n} ${n===1?'ricetta assegnata':'ricette assegnate'} al gruppo "${g}".`,
+    select_mode_label:"Seleziona ricette a mano (spunta le card)",
+    selected_count_label:(n)=>`${n} ${n===1?'selezionata':'selezionate'}`,
+    bulk_group_note_select:"Spunta le ricette che vuoi nella griglia qui sotto, poi scrivi il nome del gruppo e assegnalo solo a quelle selezionate.",
     btn_auto_calc:"🧮 Calcola dai valori degli ingredienti",
     auto_calc_note:"Collega ogni ingrediente a un alimento del database (scheda Equivalenze) e indica la quantità in grammi per includerlo nel calcolo automatico. Puoi comunque correggere i valori a mano.",
     ing_not_linked_note:"Questo ingrediente non è collegato a un alimento del database: non contribuirà al calcolo dei micronutrienti (vitamine e minerali).",
@@ -1742,6 +1752,9 @@ const I18N = {
     alert_bulk_group_no_matches:"Aucune recette trouvée avec cette recherche — essaie de chercher quelque chose dans la barre ci-dessus d'abord.",
     confirm_bulk_group_apply:(n,g)=>`Assigner le groupe "${g}" à ${n} ${n===1?'recette trouvée':'recettes trouvées'} ? Cela écrase le groupe actuel, s'il y en a un.`,
     alert_bulk_group_done:(n,g)=>`C'est fait ! ${n} ${n===1?'recette assignée':'recettes assignées'} au groupe "${g}".`,
+    select_mode_label:"Sélectionner les recettes à la main (coche les cartes)",
+    selected_count_label:(n)=>`${n} ${n===1?'sélectionnée':'sélectionnées'}`,
+    bulk_group_note_select:"Coche les recettes que tu veux dans la grille ci-dessous, puis écris le nom du groupe et assigne-le uniquement à celles sélectionnées.",
     btn_auto_calc:"🧮 Calculer à partir des ingrédients",
     auto_calc_note:"Associe chaque ingrédient à un aliment de la base de données (onglet Équivalences) et indique la quantité en grammes pour l'inclure dans le calcul automatique. Tu peux toujours corriger les valeurs à la main.",
     ing_not_linked_note:"Cet ingrédient n'est pas associé à un aliment de la base de données : il ne contribuera pas au calcul des micronutriments (vitamines et minéraux).",
@@ -3474,6 +3487,8 @@ document.getElementById('addItemBtn').addEventListener('click', ()=>{
 
 /* ---------- RECIPES ---------- */
 let recipeGroupFilter = '';
+let recipeSelectMode = false;
+let selectedRecipeIds = new Set();
 function renderRecipes(){
   const grid = document.getElementById('recipeGrid');
   renderRecipeGroupFilter();
@@ -3486,7 +3501,9 @@ function renderRecipes(){
   let html = filtered.map(r=>{
     const m = r.macros || {};
     const linkBtn = r.link ? `<a href="${escapeAttr(r.link)}" target="_blank" rel="noopener" class="btn btn-ghost btn-sm" style="display:inline-block;" onclick="event.stopPropagation()">🔗 ${escapeHtml(r.link.length>26?r.link.slice(0,26)+'…':r.link)}</a>` : '';
-    return `<div class="recipe-card" data-id="${r.id}">
+    const checkboxHtml = recipeSelectMode ? `<label style="position:absolute;top:10px;right:10px;background:var(--white);border-radius:6px;padding:4px 6px;box-shadow:0 1px 4px rgba(0,0,0,0.15);z-index:2;" onclick="event.stopPropagation()"><input type="checkbox" class="recipe-select-checkbox" data-id="${r.id}" style="width:auto;margin:0;" ${selectedRecipeIds.has(r.id)?'checked':''}></label>` : '';
+    return `<div class="recipe-card" data-id="${r.id}" style="position:relative;">
+      ${checkboxHtml}
       ${r.photo ? `<img class="recipe-card-photo" src="${r.photo}">` : ''}
       <span class="recipe-cat-tag">${escapeHtml(recipeCategory(r))}</span>
       <h4>${escapeHtml(recipeName(r))}</h4>
@@ -3506,8 +3523,26 @@ function renderRecipes(){
   html += `<div class="new-recipe-tile no-print" id="newRecipeTile">${t('new_recipe_tile')}</div>`;
   grid.innerHTML = html;
 
+  updateSelectedCountLabel();
   grid.querySelectorAll('.recipe-card').forEach(card=>{
-    card.addEventListener('click', ()=> openRecipeViewModal(card.dataset.id));
+    card.addEventListener('click', ()=>{
+      if(recipeSelectMode){
+        const id = card.dataset.id;
+        if(selectedRecipeIds.has(id)) selectedRecipeIds.delete(id); else selectedRecipeIds.add(id);
+        const cb = card.querySelector('.recipe-select-checkbox');
+        if(cb) cb.checked = selectedRecipeIds.has(id);
+        updateSelectedCountLabel();
+        return;
+      }
+      openRecipeViewModal(card.dataset.id);
+    });
+  });
+  grid.querySelectorAll('.recipe-select-checkbox').forEach(cb=>{
+    cb.addEventListener('change', ()=>{
+      const id = cb.dataset.id;
+      if(cb.checked) selectedRecipeIds.add(id); else selectedRecipeIds.delete(id);
+      updateSelectedCountLabel();
+    });
   });
   grid.querySelectorAll('.listen-card-btn').forEach(btn=>{
     btn.addEventListener('click', ()=>{
@@ -4574,17 +4609,31 @@ document.getElementById('recipeGroupFilter').addEventListener('change', (e)=>{
   recipeGroupFilter = e.target.value;
   renderRecipes();
 });
+document.getElementById('recipeSelectModeToggle').addEventListener('change', (e)=>{
+  recipeSelectMode = e.target.checked;
+  if(!recipeSelectMode) selectedRecipeIds.clear();
+  document.getElementById('bulkGroupNote').textContent = recipeSelectMode ? t('bulk_group_note_select') : t('bulk_group_note');
+  renderRecipes();
+});
+function updateSelectedCountLabel(){
+  const label = document.getElementById('selectedCountLabel');
+  if(!recipeSelectMode){ label.textContent = ''; return; }
+  label.textContent = t('selected_count_label')(selectedRecipeIds.size);
+}
 document.getElementById('bulkGroupApplyBtn').addEventListener('click', ()=>{
   const groupName = document.getElementById('bulkGroupInput').value.trim();
   if(!groupName){ alert(t('alert_bulk_group_name_needed')); return; }
-  const matches = recipeSearchQuery
-    ? state.recipes.filter(r => (r.name||'').toLowerCase().includes(recipeSearchQuery))
-    : state.recipes;
+  const matches = recipeSelectMode
+    ? state.recipes.filter(r => selectedRecipeIds.has(r.id))
+    : (recipeSearchQuery
+        ? state.recipes.filter(r => (r.name||'').toLowerCase().includes(recipeSearchQuery))
+        : state.recipes);
   if(matches.length === 0){ alert(t('alert_bulk_group_no_matches')); return; }
   if(!confirm(t('confirm_bulk_group_apply')(matches.length, groupName))) return;
   matches.forEach(r => r.group = groupName);
   persist();
   document.getElementById('bulkGroupInput').value = '';
+  if(recipeSelectMode){ selectedRecipeIds.clear(); }
   renderRecipes();
   alert(t('alert_bulk_group_done')(matches.length, groupName));
 });
